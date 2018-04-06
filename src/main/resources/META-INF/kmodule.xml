@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kmodule xmlns="http://www.drools.org/xsd/kmodule">
+
+	<kbase name="calculationsBase" packages="rules.crime.means.calculations">
+			<ksession name="crimeMeansCalculation" type="stateless" />
+	</kbase>
+
+	<kbase name="decisionBase" packages="rules.crime.means.decision" includes="calculationsBase">
+		<ksession name="crimeDecision" type="stateless" />
+	</kbase>
+
+</kmodule>

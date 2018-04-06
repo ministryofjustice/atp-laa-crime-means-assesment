@@ -1,0 +1,45 @@
+package rules.civil.decision
+
+import com.laa.model.crime.CrimeMeansDecisionReport;
+import com.laa.model.crime.CourtType;
+import com.laa.model.crime.CrimeAssessmentResult;
+
+
+import java.math.BigDecimal;
+
+
+rule "adjusted income limit check"
+	when
+		$decision : CrimeMeansDecisionReport( adjustedIncome !=null && adjustedIncome.compareTo(new BigDecimal("12475")) < 0)
+	then
+		$decision.setAdjustedIncomeBelowLowerThreshold(true);
+		update($decision);
+		
+end
+
+
+rule "Verify if means assesment is passed for megistrate court case when adjustedIncomeBelowLowerThreshold is true"
+	when
+		$decision: CrimeMeansDecisionReport(adjustedIncomeBelowLowerThreshold  == true, courtType == CourtType.MAGISTRATE )
+	then
+		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED);
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,185 @@
+package rules.civil.calculations.income
+import com.laa.model.MeansInformation;
+import com.laa.model.Applicant;
+import com.laa.model.EmployedIncome;
+import com.laa.model.civil.enums.PaymentFrequency;
+import com.laa.model.crime.CrimeCase;
+import com.laa.model.crime.CrimeMeansDecisionReport;
+import com.laa.model.crime.CrimeDependent;
+import com.laa.model.crime.Weight;
+
+import java.math.RoundingMode;
+import java.math.BigDecimal;
+import com.laa.model.OtherIncome;
+import com.laa.model.Partner;
+import com.laa.model.civil.enums.PaymentFrequency;
+import com.laa.model.civil.enums.IncomeType;
+import java.util.Optional;
+import com.laa.model.Dependent;
+import com.laa.model.civil.enums.RelationToApplicant;
+import java.util.ArrayList;
+import com.laa.model.Dependent;
+import com.laa.model.enums.AccountType;
+
+rule "calculate employed income and gross household income"
+lock-on-active  true
+	when
+		$case : CrimeCase(  meansInformation.applicant.employedIncomeHistory.empty   == false)
+		$decision : CrimeMeansDecisionReport( employmentIncome == null  )
+	then
+		MeansInformation meansInformation = $case.getMeansInformation();
+		BigDecimal annualSalarySum = meansInformation.
+			getApplicant().
+			getEmployedIncomeHistory().
+			stream().
+			filter(income -> income.getFrequency() == PaymentFrequency.MONTHLY).
+			map(income -> income.getPay().multiply(BigDecimal.valueOf(12))).
+			reduce(BigDecimal.ZERO, BigDecimal::add);
+			
+		BigDecimal averageAnnualSalary = annualSalarySum.divide(new BigDecimal(meansInformation.getApplicant().getEmployedIncomeHistory().size()), RoundingMode.HALF_EVEN);
+
+        System.out.println("averageAnnualSalary " + averageAnnualSalary);
+
+		$decision.setEmploymentIncome(averageAnnualSalary);
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(averageAnnualSalary));
+
+		update($decision);
+end
+
+
+rule "process applicant's child tax credit and add to gross household income"
+lock-on-active true
+when		
+		$decision : CrimeMeansDecisionReport(  )
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
+	then
+	      	MeansInformation meansInformation = $case.getMeansInformation();
+            		BigDecimal annualChildTaxCredit = meansInformation.
+            			getApplicant().
+            			getOtherIncome().
+            			stream().
+            			filter(income -> income.getIncomeType() == IncomeType.CHILD_TAX_CREDIT).
+            			filter(income -> income.getFrequency() == PaymentFrequency.WEEKLY).
+            			map(income -> income.getAmount().multiply(BigDecimal.valueOf(52))).
+            			reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        System.out.println("annualChildTaxCredit " + annualChildTaxCredit);
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildTaxCredit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		update($decision);
+end
+
+
+rule "process applicant's other miscellanious income add to gross household income"
+lock-on-active true
+when		
+		$decision : CrimeMeansDecisionReport(  )
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
+	then
+	      	MeansInformation meansInformation = $case.getMeansInformation();
+            		BigDecimal annualMiscIncome = meansInformation.
+            			getApplicant().
+            			getOtherIncome().
+            			stream().
+            			filter(income -> income.getIncomeType() == IncomeType.MISCELLANEOUS).
+            			filter(income -> income.getFrequency() == PaymentFrequency.MONTHLY).
+				            map(income -> income.getAmount().multiply(BigDecimal.valueOf(12))).
+            			reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        System.out.println("annualMiscIncome " + annualMiscIncome);
+
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualMiscIncome).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		update($decision);
+end
+
+rule "process partner child credit and add to gross household income"
+lock-on-active true
+when
+		$decision : CrimeMeansDecisionReport(  )
+		$case : CrimeCase( $otherIncomes :  meansInformation.partner.otherIncome )
+      	$benefit : OtherIncome( incomeType == IncomeType.CHILD_BENEFIT ) from $otherIncomes
+	then
+	      	MeansInformation meansInformation = $case.getMeansInformation();
+            		BigDecimal annualChildCredit = meansInformation.
+            			getPartner().
+            			getOtherIncome().
+            			stream().
+            			filter(income -> income.getIncomeType() == IncomeType.CHILD_BENEFIT).
+            			filter(income -> income.getFrequency() == PaymentFrequency.WEEKLY).
+            			map(income -> income.getAmount().multiply(BigDecimal.valueOf(52))).
+            			reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            			System.out.println("annualChildCredit " + annualChildCredit);
+
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildCredit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		update($decision);
+end
+
+rule "process weight for partner"
+lock-on-active true
+when
+		$decision : CrimeMeansDecisionReport(  )
+		not MeansInformation( partner == null );
+	then
+		$decision.setPartnerWeight(BigDecimal.valueOf( 0.64));
+		System.out.println("partner weight  " + $decision.getPartnerWeight());
+		update($decision);
+end
+
+rule "process weight for children"
+lock-on-active true
+when
+		$decision : CrimeMeansDecisionReport(  )
+		// not MeansInformation( dependents == empty ); this rule should not trigger when no dependents.
+		// MeansInformation( $dependents: dependents   );
+		// CrimeDependent( relationToApplicant == RelationToApplicant.CHILD_OF_APPLICANT ) from $dependents
+		 $case : CrimeCase( )
+		
+then
+	MeansInformation meansInformation = $case.getMeansInformation();
+            		BigDecimal childrenWeight = meansInformation.
+            			getDependents().
+            			stream().
+            			filter(dependent -> dependent instanceof CrimeDependent).
+            			map (dependent -> (CrimeDependent) dependent).
+            			filter(dependent -> dependent.getRelationToApplicant() == RelationToApplicant.CHILD_OF_APPLICANT).
+            			map(dependent -> Weight.getWeight(dependent.getChildAge())).
+            			reduce(BigDecimal.ZERO, BigDecimal::add);
+            
+		System.out.println("children  weight  " + childrenWeight);
+		$decision.setChildWeight(childrenWeight);
+		update($decision);
+end
+
+rule "process total weight"
+lock-on-active true
+when
+		$decision : CrimeMeansDecisionReport(  )
+then
+	$decision.setTotalWeight(
+	BigDecimal.ONE.
+	add(Optional.ofNullable($decision.getPartnerWeight()).orElse(BigDecimal.ZERO)).
+	add(Optional.ofNullable($decision.getChildWeight()).orElse(BigDecimal.ZERO)));
+	System.out.println("total   weight  " + $decision.getTotalWeight());
+	System.out.println("gross household income  " + $decision.getGrossHouseholdIncome());
+	
+	update($decision);
+end
+
+
+rule "process adjusted income"
+lock-on-active true
+when
+		$decision : CrimeMeansDecisionReport(  )
+	    //not CrimeMeansDecisionReport( grossHouseholdIncome  == null );
+	   //not CrimeMeansDecisionReport( totalWeight   == null );
+	    
+then
+	BigDecimal annualAdjustedIncome = 
+	$decision.getGrossHouseholdIncome().divide($decision.getTotalWeight(), RoundingMode.HALF_EVEN);
+	System.out.println("annualAdjustedIncome     " + annualAdjustedIncome);
+	$decision.setAdjustedIncome(annualAdjustedIncome);
+	
+	update($decision);
+end
+
+
