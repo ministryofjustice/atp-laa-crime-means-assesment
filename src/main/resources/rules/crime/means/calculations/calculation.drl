@@ -1,9 +1,11 @@
-package rules.civil.calculations.income
+package rules.crime.means.calculations
 import com.laa.model.MeansInformation;
 import com.laa.model.Applicant;
 import com.laa.model.EmployedIncome;
 import com.laa.model.civil.enums.PaymentFrequency;
 import com.laa.model.crime.CrimeCase;
+import com.laa.model.crime.CourtType;
+import com.laa.model.crime.CaseType;
 import com.laa.model.crime.CrimeMeansDecisionReport;
 import com.laa.model.crime.CrimeDependent;
 import com.laa.model.crime.Weight;
@@ -20,6 +22,19 @@ import com.laa.model.civil.enums.RelationToApplicant;
 import java.util.ArrayList;
 import com.laa.model.Dependent;
 import com.laa.model.enums.AccountType;
+
+
+rule "set courtType and caseType"
+lock-on-active  true
+	when
+		$case : CrimeCase(  courtType   != null, caseType != null)
+		$decision : CrimeMeansDecisionReport(courtType == null , caseType == null)
+	then
+		$decision.setCourtType($case.getCourtType());
+		$decision.setCaseType($case.getCaseType());
+		update($decision);
+end
+
 
 rule "calculate employed income and gross household income"
 lock-on-active  true

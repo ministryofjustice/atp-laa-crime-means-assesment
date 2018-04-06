@@ -33,7 +33,7 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     @Qualifier("crimeDecision")
     private StatelessKieSession kieSession;
 
-    @Given("^a meg court case$")
+    @Given("^a megistrate court case$")
     public void caseWithEmployed() {
 
         this.crimeCase = new CrimeCase();
@@ -53,7 +53,7 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
 
     }
 
-    @And("^citizen receives the following child tax benefit")
+    @And("^citizen receives the following child tax benefit:")
     public void citizenOtherIncome(List<OtherIncome> otherIncomes) {
 
         MeansInformation means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
@@ -75,7 +75,6 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         means.setApplicant(applicant);
     }
 
-
     @And("^citizen has following partner with other income:")
     public void partnerOtherIncome(List<OtherIncome> otherIncome) {
 
@@ -84,7 +83,6 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         partner.setOtherIncome(otherIncome);
         means.setPartner(partner);
         crimeCase.setMeansInformation(means);
-
     }
 
     @And("^citizen has following children:")
@@ -95,10 +93,8 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
             List<Dependent> crimeDependents = new ArrayList<>();
             means.setDependents(crimeDependents);
         }
-
         means.getDependents().addAll(dependents);
         crimeCase.setMeansInformation(means);
-
     }
 
     @When("^rule engine is executed$")
@@ -106,13 +102,11 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
 
         this.decisionReport = new CrimeMeansDecisionReport();
         kieSession.execute(Stream.of(crimeCase, decisionReport).collect(Collectors.toList()));
-
     }
 
     @Then("^citizen employed income is (\\d+.\\d+)$")
     public void applicantEmployedIncomeIs(BigDecimal expectedEmployedIncome) {
         assertThat(decisionReport.getEmploymentIncome()).isEqualTo(expectedEmployedIncome);
-
     }
 
     @Then("^citizen gross combined household income is (\\d+.\\d+)$")
@@ -130,17 +124,24 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         assertThat(weighting).isEqualTo(decisionReport.getTotalWeight());
     }
 
-    @Then("^adjustedIncomeBelowLowerThreshold is (\\d+.\\d+)$")
-    public void adjustedIncomeBelowLowerThreshold(boolean adjustedIncomeBelowLowerThreshold) {
-        assertThat(adjustedIncomeBelowLowerThreshold).isEqualTo(decisionReport.isAdjustedIncomeBelowLowerThreshold());
+    @Then("^adjustedIncomeBelowLowerThreshold is true$")
+    public void adjustedIncomeBelowLowerThreshold() {
+        assertThat(true).isEqualTo(decisionReport.isAdjustedIncomeBelowLowerThreshold());
+    }
+    
+    @Then("^court type is megistrate$")
+    public void courtType() {
+        assertThat(CourtType.MAGISTRATE).isEqualTo(decisionReport.getCourtType());
+    }
+    
+    @Then("^case type is indictable$")
+    public void caseType() {
+        assertThat(CaseType.INDICTABLE).isEqualTo(decisionReport.getCaseType());
     }
 
-    @Then("^citizen passed means test is (\\d+.\\d+)$")
-    public void meansPassed(String passed) {
-        System.out.println("decisionReport.getCrimeAssessmentResult().toString()" + decisionReport.getCrimeAssessmentResult().toString());
-        System.out.println("PASSED  is" + passed);
-        assertThat(passed).isEqualTo(decisionReport.getCrimeAssessmentResult().toString());
-
+    @Then("^citizen passed means test$")
+    public void meansPassed() {
+        assertThat(CrimeAssessmentResult.PASSED).isEqualTo(decisionReport.getCrimeAssessmentResult());
     }
 
 }

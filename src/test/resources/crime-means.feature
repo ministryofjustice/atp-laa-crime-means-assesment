@@ -3,7 +3,7 @@
 
     Scenario: Citizen with a meg court case having a partner and two children
 
-      Given a meg court case
+      Given a megistrate court case
 
       And citizen is employed with following income:
       															| pay |  incomeTax | nationalInsurance | frequency |
@@ -35,7 +35,9 @@
       Then citizen gross combined household income is 24660
       Then total weighting  is 2.46
       Then adjustedIncomeBelowLowerThreshold is true
-      Then citizen passed means test is PASSED
+      Then court type is megistrate
+      Then case type is indictable
+      Then citizen passed means test
       
       
       

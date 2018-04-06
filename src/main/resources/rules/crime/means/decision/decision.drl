@@ -1,4 +1,4 @@
-package rules.civil.decision
+package rules.crime.means.decision
 
 import com.laa.model.crime.CrimeMeansDecisionReport;
 import com.laa.model.crime.CourtType;
@@ -18,11 +18,12 @@ rule "adjusted income limit check"
 end
 
 
-rule "Verify if means assesment is passed for megistrate court case when adjustedIncomeBelowLowerThreshold is true"
+rule "Verify if means assessment is passed for megistrate court case when adjustedIncomeBelowLowerThreshold is true"
 	when
 		$decision: CrimeMeansDecisionReport(adjustedIncomeBelowLowerThreshold  == true, courtType == CourtType.MAGISTRATE )
 	then
 		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED);
+		update($decision);
 end
 
 
