@@ -67,6 +67,7 @@ lock-on-active true
 when		
 		$decision : CrimeMeansDecisionReport(  )
 		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
+		$benefit : OtherIncome( incomeType == IncomeType.CHILD_TAX_CREDIT ) from $otherIncomes
 	then
 	      	MeansInformation meansInformation = $case.getMeansInformation();
             		BigDecimal annualChildTaxCredit = meansInformation.
@@ -89,6 +90,7 @@ lock-on-active true
 when		
 		$decision : CrimeMeansDecisionReport(  )
 		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
+		$benefit : OtherIncome( incomeType == IncomeType.MISCELLANEOUS ) from $otherIncomes
 	then
 	      	MeansInformation meansInformation = $case.getMeansInformation();
             		BigDecimal annualMiscIncome = meansInformation.
@@ -133,7 +135,7 @@ rule "process weight for partner"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
-		not MeansInformation( partner == null );
+		not MeansInformation( partner != null );
 	then
 		$decision.setPartnerWeight(BigDecimal.valueOf( 0.64));
 		System.out.println("partner weight  " + $decision.getPartnerWeight());
@@ -144,11 +146,9 @@ rule "process weight for children"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
-		// not MeansInformation( dependents == empty ); this rule should not trigger when no dependents.
-		// MeansInformation( $dependents: dependents   );
-		// CrimeDependent( relationToApplicant == RelationToApplicant.CHILD_OF_APPLICANT ) from $dependents
-		 $case : CrimeCase( )
-		
+		$case : CrimeCase($dependents :  meansInformation.dependents.empty   == false   )
+		//CrimeDependent( relationToApplicant == RelationToApplicant.CHILD_OF_APPLICANT ) from $dependents
+		// TODO: how to test that dependennts has a CHILD_OF_APPLICANT
 then
 	MeansInformation meansInformation = $case.getMeansInformation();
             		BigDecimal childrenWeight = meansInformation.
@@ -185,12 +185,12 @@ rule "process adjusted income"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
-	    //not CrimeMeansDecisionReport( grossHouseholdIncome  == null );
+		//$decision : CrimeMeansDecisionReport( grossHouseholdIncome!=null, totalWeight   == null) TODO: how to acieve this?
+	   // not CrimeMeansDecisionReport( grossHouseholdIncome  == null );
 	   //not CrimeMeansDecisionReport( totalWeight   == null );
 	    
 then
-	BigDecimal annualAdjustedIncome = 
-	$decision.getGrossHouseholdIncome().divide($decision.getTotalWeight(), RoundingMode.HALF_EVEN);
+	BigDecimal annualAdjustedIncome =  $decision.getGrossHouseholdIncome().divide($decision.getTotalWeight(), RoundingMode.HALF_EVEN);
 	System.out.println("annualAdjustedIncome     " + annualAdjustedIncome);
 	$decision.setAdjustedIncome(annualAdjustedIncome);
 	

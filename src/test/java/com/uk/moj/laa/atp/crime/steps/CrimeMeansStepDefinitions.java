@@ -24,9 +24,8 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
 
     private CrimeCase crimeCase;
-
-    MeansInformation means;
-
+    private MeansInformation means;
+    private Applicant applicant;
     private CrimeMeansDecisionReport decisionReport;
 
     @Autowired
@@ -40,6 +39,8 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         crimeCase.setCaseType(CaseType.INDICTABLE);
         crimeCase.setCourtType(CourtType.MAGISTRATE);
         means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
+        applicant = ofNullable(means.getApplicant()).orElse(new Applicant());
+        means.setApplicant(applicant);
         crimeCase.setMeansInformation(means);
     }
 
@@ -56,7 +57,6 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     @And("^citizen receives the following child tax benefit:")
     public void citizenOtherIncome(List<OtherIncome> otherIncomes) {
 
-        MeansInformation means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
         Applicant applicant = ofNullable(means.getApplicant()).orElse(new Applicant());
         List<OtherIncome> exitingOtherIncome = ofNullable(applicant.getOtherIncome()).orElse(new ArrayList<OtherIncome>());
         exitingOtherIncome.addAll(otherIncomes);
@@ -67,8 +67,6 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     @And("^citizen receives the following miscellanious benefit:")
     public void citizenMiscellaniousIcome(List<OtherIncome> otherIncomes) {
 
-        MeansInformation means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
-        Applicant applicant = ofNullable(means.getApplicant()).orElse(new Applicant());
         List<OtherIncome> exitingOtherIncome = ofNullable(applicant.getOtherIncome()).orElse(new ArrayList<OtherIncome>());
         exitingOtherIncome.addAll(otherIncomes);
         applicant.setOtherIncome(exitingOtherIncome);
@@ -78,7 +76,6 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     @And("^citizen has following partner with other income:")
     public void partnerOtherIncome(List<OtherIncome> otherIncome) {
 
-        MeansInformation means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
         Partner partner = ofNullable(means.getPartner()).orElse(new Partner());
         partner.setOtherIncome(otherIncome);
         means.setPartner(partner);
@@ -86,14 +83,10 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     }
 
     @And("^citizen has following children:")
-    public void citizenChildren(List<CrimeDependent> dependents) {
+    public void citizenChildren(List<CrimeDependent> crimeDependents) {
 
-        MeansInformation means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
-        if (means.getDependents() == null) {
-            List<Dependent> crimeDependents = new ArrayList<>();
-            means.setDependents(crimeDependents);
-        }
-        means.getDependents().addAll(dependents);
+    	means.setDependents(ofNullable(means.getDependents()).orElse(new ArrayList<>()));
+        means.getDependents().addAll(crimeDependents);
         crimeCase.setMeansInformation(means);
     }
 
