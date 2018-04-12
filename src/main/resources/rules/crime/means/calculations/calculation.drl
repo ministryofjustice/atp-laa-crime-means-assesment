@@ -2,6 +2,7 @@ package rules.crime.means.calculations
 import com.laa.model.MeansInformation;
 import com.laa.model.Applicant;
 import com.laa.model.EmployedIncome;
+import com.laa.model.civil.enums.EmploymentStatus;
 import com.laa.model.civil.enums.PaymentFrequency;
 import com.laa.model.crime.CrimeCase;
 import com.laa.model.crime.CourtType;
@@ -16,71 +17,281 @@ import com.laa.model.OtherIncome;
 import com.laa.model.Partner;
 import com.laa.model.civil.enums.PaymentFrequency;
 import com.laa.model.civil.enums.IncomeType;
+import com.laa.model.civil.enums.OutgoingType;
 import java.util.Optional;
 import com.laa.model.Dependent;
+import com.laa.model.Outgoing;
 import com.laa.model.civil.enums.RelationToApplicant;
 import java.util.ArrayList;
 import com.laa.model.Dependent;
 import com.laa.model.enums.AccountType;
 
-
-rule "set courtType and caseType"
-lock-on-active  true
+rule "set courtType"
 	when
-		$case : CrimeCase(  courtType   != null, caseType != null)
-		$decision : CrimeMeansDecisionReport(courtType == null , caseType == null)
+		$case : CrimeCase(  courtType != null)
+		$decision : CrimeMeansDecisionReport(courtType == null)
 	then
 		$decision.setCourtType($case.getCourtType());
+		update($decision);
+end
+
+
+rule "set caseType"
+	when
+		$case : CrimeCase(caseType != null)
+		$decision : CrimeMeansDecisionReport(caseType == null)
+	then
 		$decision.setCaseType($case.getCaseType());
 		update($decision);
 end
 
 
-rule "calculate employed income and gross household income"
+rule "set applicant's employment status"
 lock-on-active  true
 	when
-		$case : CrimeCase(  meansInformation.applicant.employedIncomeHistory.empty   == false)
+		$case : CrimeCase( )
+		$decision : CrimeMeansDecisionReport( employmentStatus == null  )
+		
+	then
+	
+	 if ($case.getMeansInformation().getApplicant().getEmployedIncomeHistory() == null || $case.getMeansInformation().getApplicant().getEmployedIncomeHistory().isEmpty()) {
+	 		$decision.setEmploymentStatus(EmploymentStatus.UNEMPLOYED);
+	 } 
+	 else {
+	 		$decision.setEmploymentStatus(EmploymentStatus.EMPLOYED);
+	 }
+	 
+		update($decision);
+end
+
+// frequency for tax and ni could not be same as income frequecy, so model may change, for now it kept same.
+
+rule "calculate applicant's employed income,ni, tax , gross household income"
+lock-on-active  true
+	when
+		$case : CrimeCase( meansInformation.applicant.employedIncomeHistory !=null &&  meansInformation.applicant.employedIncomeHistory.empty   == false)
 		$decision : CrimeMeansDecisionReport( employmentIncome == null  )
 	then
-		MeansInformation meansInformation = $case.getMeansInformation();
-		BigDecimal annualSalarySum = meansInformation.
-			getApplicant().
-			getEmployedIncomeHistory().
-			stream().
-			filter(income -> income.getFrequency() == PaymentFrequency.MONTHLY).
-			map(income -> income.getPay().multiply(BigDecimal.valueOf(12))).
-			reduce(BigDecimal.ZERO, BigDecimal::add);
+		EmployedIncome employedIncome  = $case.getMeansInformation().getApplicant().getEmployedIncomeHistory().get(0);
+		
+		BigDecimal annualPay = new BigDecimal(0.00);
+		BigDecimal annualNI = new BigDecimal(0.00);
+		BigDecimal annualTax = new BigDecimal(0.00);
+		
+		if (employedIncome.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(12));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(12));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(12));
 			
-		BigDecimal averageAnnualSalary = annualSalarySum.divide(new BigDecimal(meansInformation.getApplicant().getEmployedIncomeHistory().size()), RoundingMode.HALF_EVEN);
-
-        System.out.println("averageAnnualSalary " + averageAnnualSalary);
-
-		$decision.setEmploymentIncome(averageAnnualSalary);
-		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(averageAnnualSalary));
-
+		} else if (employedIncome.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(52));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(52));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(52));
+			
+		}
+		else if (employedIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(26));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(26));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(26));
+		}
+		 else if (employedIncome.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualPay = employedIncome.getPay();
+			annualNI = employedIncome.getNationalInsurance();
+			annualTax = employedIncome.getIncomeTax();
+		}
+		
+		$decision.setPayeAndNi(BigDecimal.ZERO.add(annualTax).add(annualNI));
+		$decision.setEmploymentIncome(annualPay.setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualPay).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		$decision.setTotalOutgoings(Optional.ofNullable($decision.getTotalOutgoings()).orElse(BigDecimal.ZERO).add($decision.getPayeAndNi()));
+	 System.out.println("annualPay " + annualPay);
+		
+	 System.out.println("annualTax " + annualTax);
+	 System.out.println("annualNI " + annualNI);
+	 
 		update($decision);
 end
 
 
-rule "process applicant's child tax credit and add to gross household income"
+rule "calculate partner income, gross household income"
+lock-on-active  true
+	when
+		$case : CrimeCase( meansInformation.partner !=null &&  meansInformation.partner.employedIncome   != null)
+		$decision : CrimeMeansDecisionReport( partnerEmploymentIncome == null  )
+	then
+	
+		//todo we should consider ni and tax as well like we do for applicant
+		EmployedIncome employedIncome  = $case.getMeansInformation().getPartner().getEmployedIncome();
+		
+		BigDecimal annualPay = new BigDecimal(0.00);
+		
+		if (employedIncome.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(12));
+			
+		} else if (employedIncome.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(52));
+			
+		}
+		else if (employedIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(26));
+		}
+		 else if (employedIncome.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualPay = employedIncome.getPay();
+		}
+		
+		$decision.setPartnerEmploymentIncome(annualPay.setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualPay).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
+	 	System.out.println("partner annualPay " + annualPay);
+		
+		update($decision);
+end
+
+rule "process applicant's child benefit, gross household income and disposable income"
 lock-on-active true
 when		
 		$decision : CrimeMeansDecisionReport(  )
-		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
+		// TODO: check if this line below is a condition to skip then block, if condition is met it will $otherIncomes otherwise then block will be skipped??
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome !=null && meansInformation.applicant.otherIncome.empty == false )	
+		$benefit : OtherIncome( incomeType == IncomeType.CHILD_BENEFIT ) from $otherIncomes
+	then
+	
+		BigDecimal annualChildBenefit = new BigDecimal(0.00);
+		
+		if($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(12));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(52));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(26));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualChildBenefit = $benefit.getAmount();
+		}
+		
+		annualChildBenefit = annualChildBenefit.setScale(2, BigDecimal.ROUND_HALF_EVEN);
+        System.out.println("annualChildBenefit " + annualChildBenefit);
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildBenefit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
+		update($decision);
+end
+
+
+rule "process applicant's child tax credit ,gross household income and disposable income"
+lock-on-active true
+when		
+		$decision : CrimeMeansDecisionReport(  )
+		// TODO: check if this line below is a condition to skip then block, if condition is met it will $otherIncomes otherwise then block will be skipped??
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome !=null && meansInformation.applicant.otherIncome.empty == false )	
 		$benefit : OtherIncome( incomeType == IncomeType.CHILD_TAX_CREDIT ) from $otherIncomes
 	then
-	      	MeansInformation meansInformation = $case.getMeansInformation();
-            		BigDecimal annualChildTaxCredit = meansInformation.
-            			getApplicant().
-            			getOtherIncome().
-            			stream().
-            			filter(income -> income.getIncomeType() == IncomeType.CHILD_TAX_CREDIT).
-            			filter(income -> income.getFrequency() == PaymentFrequency.WEEKLY).
-            			map(income -> income.getAmount().multiply(BigDecimal.valueOf(52))).
-            			reduce(BigDecimal.ZERO, BigDecimal::add);
-
+	
+		BigDecimal annualChildTaxCredit = new BigDecimal(0.00);
+		
+		if($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(12));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(52));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(26));
+		}
+		else if($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualChildTaxCredit = $benefit.getAmount();
+		}
+		
+		annualChildTaxCredit = annualChildTaxCredit.setScale(2, BigDecimal.ROUND_HALF_EVEN);
         System.out.println("annualChildTaxCredit " + annualChildTaxCredit);
 		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildTaxCredit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
+		update($decision);
+end
+
+rule "process child care fees and disposable income"
+lock-on-active 
+	when
+	
+		$case : CrimeCase( $outgoings : meansInformation.outgoings   )	
+		$childCareFees : Outgoing( outGoingType == OutgoingType.CHILD_CARE_FEES ) from $outgoings 
+		$decision : 	CrimeMeansDecisionReport(  )
+		
+	then
+		BigDecimal annualChildCareFee = new BigDecimal(0.00);
+		
+		if($childCareFees.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(12));
+			
+		} else if($childCareFees.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(52));
+			
+		}else if($childCareFees.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(26));
+		
+		}else if($childCareFees.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualChildCareFee = $childCareFees.getAmount();
+		}
+		
+		$decision.setTotalOutgoings(Optional.ofNullable($decision.getTotalOutgoings()).orElse(BigDecimal.ZERO).add(annualChildCareFee));
+		System.out.println("annualChildCareFee " + annualChildCareFee);
+		
+		update($decision);
+end
+
+rule "process mortgage or rent and disposable income"
+lock-on-active 
+	when
+	
+		$case : CrimeCase( $outgoings : meansInformation.outgoings   )	
+		$mortgage : Outgoing( outGoingType == OutgoingType.MORTGAGE_PAYMENT ) from $outgoings 
+		$decision : 	CrimeMeansDecisionReport(  )
+		
+	then
+		BigDecimal annualMortgage = new BigDecimal(0.00);
+		
+		if($mortgage.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(12));
+		} else if($mortgage.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(52));
+		} else if($mortgage.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(26));
+		} else if($mortgage.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualMortgage = $mortgage.getAmount();
+		}
+		
+		$decision.setTotalOutgoings(Optional.ofNullable($decision.getTotalOutgoings()).orElse(BigDecimal.ZERO).add(annualMortgage));	
+		System.out.println("annualMortgage " + annualMortgage);
+		
+		update($decision);
+end
+
+
+rule "process council tax  and disposable income"
+lock-on-active 
+	when
+	
+		$case : CrimeCase( $outgoings : meansInformation.outgoings   )	
+		$councilTax : Outgoing( outGoingType == OutgoingType.COUNCIL_TAX ) from $outgoings 
+		$decision : 	CrimeMeansDecisionReport(  )
+		
+	then
+		BigDecimal annualCouncilTax = new BigDecimal(0.00);
+		
+		if($councilTax.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(12));
+		} else if($councilTax.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(52));
+		} else if($councilTax.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(26));
+		} else if($councilTax.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualCouncilTax = $councilTax.getAmount();
+		}
+		
+		$decision.setTotalOutgoings(Optional.ofNullable($decision.getTotalOutgoings()).orElse(BigDecimal.ZERO).add(annualCouncilTax));	
+		System.out.println("annualCouncilTax " + annualCouncilTax);
+		
 		update($decision);
 end
 
@@ -89,53 +300,102 @@ rule "process applicant's other miscellanious income add to gross household inco
 lock-on-active true
 when		
 		$decision : CrimeMeansDecisionReport(  )
-		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome  )	
-		$benefit : OtherIncome( incomeType == IncomeType.MISCELLANEOUS ) from $otherIncomes
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome != null && meansInformation.applicant.otherIncome.empty == false)	
+		$miscOtherIncome : OtherIncome( incomeType == IncomeType.MISCELLANEOUS ) from $otherIncomes
+		// TODO: above rule can also meet this condition so do we need to lock??
+		
 	then
-	      	MeansInformation meansInformation = $case.getMeansInformation();
-            		BigDecimal annualMiscIncome = meansInformation.
-            			getApplicant().
-            			getOtherIncome().
-            			stream().
-            			filter(income -> income.getIncomeType() == IncomeType.MISCELLANEOUS).
-            			filter(income -> income.getFrequency() == PaymentFrequency.MONTHLY).
-				            map(income -> income.getAmount().multiply(BigDecimal.valueOf(12))).
-            			reduce(BigDecimal.ZERO, BigDecimal::add);
-
+		BigDecimal annualMiscIncome = new BigDecimal(0.00);
+		
+		if ($miscOtherIncome.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualMiscIncome = $miscOtherIncome.getAmount().multiply(new BigDecimal(12));
+			
+		} else if ($miscOtherIncome.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(52));
+		}
+		else if ($miscOtherIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(26));
+		}
+		else if ($miscOtherIncome.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualMiscIncome =  $miscOtherIncome.getAmount();
+		}
+		
+		annualMiscIncome = annualMiscIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN);
         System.out.println("annualMiscIncome " + annualMiscIncome);
-
 		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualMiscIncome).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
 		update($decision);
+		
 end
 
-rule "process partner child credit and add to gross household income"
+rule "process applicant's maintenance income add to gross household income"
+lock-on-active true
+when		
+		$decision : CrimeMeansDecisionReport(  )
+		$case : CrimeCase( $otherIncomes :  meansInformation.applicant.otherIncome != null && meansInformation.applicant.otherIncome.empty == false)	
+		$maintenanceBenefit : OtherIncome( incomeType == IncomeType.MAINTENANCE_INCOME ) from $otherIncomes
+		// TODO: above rule can also meet this condition so do we need to lock??
+		
+	then
+		BigDecimal annualMaintenance = new BigDecimal(0.00);
+		
+		if ($maintenanceBenefit.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualMaintenance = $maintenanceBenefit.getAmount().multiply(new BigDecimal(12));
+			
+		} else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(52));
+		}
+		else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(26));
+		}
+		else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualMaintenance =  $maintenanceBenefit.getAmount();
+		}
+		
+		annualMaintenance = annualMaintenance.setScale(2, BigDecimal.ROUND_HALF_EVEN);
+        System.out.println("annualMaintenance " + annualMaintenance);
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualMaintenance).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
+		update($decision);
+		
+end
+
+
+rule "process partner's child credit and add to gross household income"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
+	    CrimeCase( meansInformation.partner !=null && meansInformation.partner.otherIncome !=null && meansInformation.partner.otherIncome.empty == false)
+		
 		$case : CrimeCase( $otherIncomes :  meansInformation.partner.otherIncome )
-      	$benefit : OtherIncome( incomeType == IncomeType.CHILD_BENEFIT ) from $otherIncomes
+      	$benefit : OtherIncome( incomeType == IncomeType.CHILD_BENEFIT) from $otherIncomes
 	then
-	      	MeansInformation meansInformation = $case.getMeansInformation();
-            		BigDecimal annualChildCredit = meansInformation.
-            			getPartner().
-            			getOtherIncome().
-            			stream().
-            			filter(income -> income.getIncomeType() == IncomeType.CHILD_BENEFIT).
-            			filter(income -> income.getFrequency() == PaymentFrequency.WEEKLY).
-            			map(income -> income.getAmount().multiply(BigDecimal.valueOf(52))).
-            			reduce(BigDecimal.ZERO, BigDecimal::add);
+	
+		BigDecimal annualChildBenefit = new BigDecimal(0.00);
+		
+		if ($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(12));
+			
+		} else if ($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
+			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(52));
+		}else if ($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
+			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(26));
+		}else if ($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
+			annualChildBenefit =  $benefit.getAmount();
+		}
 
-            			System.out.println("annualChildCredit " + annualChildCredit);
-
-		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildCredit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		annualChildBenefit = annualChildBenefit.setScale(2, BigDecimal.ROUND_HALF_EVEN);
+		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualChildBenefit).setScale(2, BigDecimal.ROUND_HALF_EVEN));
+		
 		update($decision);
 end
+
 
 rule "process weight for partner"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
-		not MeansInformation( partner != null );
+		CrimeCase( meansInformation.partner != null)
 	then
 		$decision.setPartnerWeight(BigDecimal.valueOf( 0.64));
 		System.out.println("partner weight  " + $decision.getPartnerWeight());
@@ -146,9 +406,9 @@ rule "process weight for children"
 lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
-		$case : CrimeCase($dependents :  meansInformation.dependents.empty   == false   )
+		$case : CrimeCase($dependents :  meansInformation.dependents !=null,  meansInformation.dependents.empty   == false )
 		//CrimeDependent( relationToApplicant == RelationToApplicant.CHILD_OF_APPLICANT ) from $dependents
-		// TODO: how to test that dependennts has a CHILD_OF_APPLICANT
+		// TODO: how to check that dependennts has a CHILD_OF_APPLICANT
 then
 	MeansInformation meansInformation = $case.getMeansInformation();
             		BigDecimal childrenWeight = meansInformation.
@@ -157,7 +417,7 @@ then
             			filter(dependent -> dependent instanceof CrimeDependent).
             			map (dependent -> (CrimeDependent) dependent).
             			filter(dependent -> dependent.getRelationToApplicant() == RelationToApplicant.CHILD_OF_APPLICANT).
-            			map(dependent -> Weight.getWeight(dependent.getChildAge())).
+            			map(dependent -> Weight.weightValue(dependent.getLowerAgeRange(), dependent.getUpperAgeRange()).multiply(new BigDecimal(dependent.getNumberOfChildren()))).
             			reduce(BigDecimal.ZERO, BigDecimal::add);
             
 		System.out.println("children  weight  " + childrenWeight);
@@ -166,14 +426,15 @@ then
 end
 
 rule "process total weight"
-lock-on-active true
 when
 		$decision : CrimeMeansDecisionReport(  )
 then
 	$decision.setTotalWeight(
-	BigDecimal.ONE.
-	add(Optional.ofNullable($decision.getPartnerWeight()).orElse(BigDecimal.ZERO)).
-	add(Optional.ofNullable($decision.getChildWeight()).orElse(BigDecimal.ZERO)));
+							new BigDecimal("1.0").
+							add(Optional.ofNullable($decision.getPartnerWeight()).orElse(BigDecimal.ZERO)).
+							add(Optional.ofNullable($decision.getChildWeight()).orElse(BigDecimal.ZERO))
+							);
+											
 	System.out.println("total   weight  " + $decision.getTotalWeight());
 	System.out.println("gross household income  " + $decision.getGrossHouseholdIncome());
 	
@@ -182,19 +443,47 @@ end
 
 
 rule "process adjusted income"
-lock-on-active true
 when
-		$decision : CrimeMeansDecisionReport(  )
-		//$decision : CrimeMeansDecisionReport( grossHouseholdIncome!=null, totalWeight   == null) TODO: how to acieve this?
-	   // not CrimeMeansDecisionReport( grossHouseholdIncome  == null );
-	   //not CrimeMeansDecisionReport( totalWeight   == null );
-	    
+		$decision : CrimeMeansDecisionReport() ;
+		 
 then
-	BigDecimal annualAdjustedIncome =  $decision.getGrossHouseholdIncome().divide($decision.getTotalWeight(), RoundingMode.HALF_EVEN);
+	BigDecimal annualAdjustedIncome =  Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).
+										divide(Optional.ofNullable($decision.getTotalWeight()).orElse(BigDecimal.ONE), RoundingMode.HALF_EVEN);
 	System.out.println("annualAdjustedIncome     " + annualAdjustedIncome);
 	$decision.setAdjustedIncome(annualAdjustedIncome);
+	System.out.println("outgoings " + $decision.getTotalOutgoings());
 	
 	update($decision);
 end
+
+rule "process adjusted annual living allowance "
+when
+		$decision : CrimeMeansDecisionReport() ;
+		 
+then
+
+	BigDecimal adjustedLivingAllowance = new BigDecimal("5676").multiply($decision.getTotalWeight()).setScale(2, BigDecimal.ROUND_HALF_EVEN);
+	$decision.setAdjustedLivingAllowance(adjustedLivingAllowance);
+	System.out.println("adjustedLivingAllowance income " + adjustedLivingAllowance);
+	
+	update($decision);
+end
+
+rule "process disposable annual income "
+when
+		$decision : CrimeMeansDecisionReport( grossHouseholdIncome != null, disposableIncome == null  )
+		
+		 
+then
+	// TODO : do we need to look for null values below.
+
+	BigDecimal add = $decision.getTotalOutgoings().add($decision.getAdjustedLivingAllowance());
+	BigDecimal disposable = $decision.getGrossHouseholdIncome().subtract(add);
+	$decision.setDisposableIncome(disposable);
+
+	System.out.println("disposable income " + disposable);
+	update($decision);
+end
+
 
 

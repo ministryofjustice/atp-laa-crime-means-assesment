@@ -1,6 +1,7 @@
 package com.uk.moj.laa.atp.crime.steps;
 
 import com.laa.model.*;
+import com.laa.model.civil.enums.EmploymentStatus;
 import com.laa.model.crime.*;
 import com.uk.moj.laa.atp.crime.SpringIntegrationTest;
 import cucumber.api.java.en.And;
@@ -32,12 +33,12 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     @Qualifier("crimeDecision")
     private StatelessKieSession kieSession;
 
-    @Given("^a megistrate court case$")
-    public void caseWithEmployed() {
+    @Given("^a ([^\"]*) and ([^\"]*) case:")
+    public void caseWithEmployed(CaseType caseType, CourtType courtType) {
 
         this.crimeCase = new CrimeCase();
-        crimeCase.setCaseType(CaseType.INDICTABLE);
-        crimeCase.setCourtType(CourtType.MAGISTRATE);
+        crimeCase.setCaseType(caseType);
+        crimeCase.setCourtType(courtType);
         means = ofNullable(crimeCase.getMeansInformation()).orElse(new MeansInformation());
         applicant = ofNullable(means.getApplicant()).orElse(new Applicant());
         means.setApplicant(applicant);
@@ -72,6 +73,15 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         applicant.setOtherIncome(exitingOtherIncome);
         means.setApplicant(applicant);
     }
+    
+    @And("^citizen receives the following maintenance benefit:")
+    public void citizenMaintenanceIcome(List<OtherIncome> otherIncomes) {
+
+        List<OtherIncome> exitingOtherIncome = ofNullable(applicant.getOtherIncome()).orElse(new ArrayList<OtherIncome>());
+        exitingOtherIncome.addAll(otherIncomes);
+        applicant.setOtherIncome(exitingOtherIncome);
+        means.setApplicant(applicant);
+    }
 
     @And("^citizen has following partner with other income:")
     public void partnerOtherIncome(List<OtherIncome> otherIncome) {
@@ -81,13 +91,29 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         means.setPartner(partner);
         crimeCase.setMeansInformation(means);
     }
+    
+    @And("^citizen has following partner with EmployedIncome income:")
+    public void partnerIncome(List<EmployedIncome> employedIncome) {
 
+        Partner partner = ofNullable(means.getPartner()).orElse(new Partner());
+        partner.setEmployedIncome(employedIncome.get(0));
+        means.setPartner(partner);
+        crimeCase.setMeansInformation(means);
+    }
+
+    
     @And("^citizen has following children:")
     public void citizenChildren(List<CrimeDependent> crimeDependents) {
 
     	means.setDependents(ofNullable(means.getDependents()).orElse(new ArrayList<>()));
         means.getDependents().addAll(crimeDependents);
         crimeCase.setMeansInformation(means);
+    }
+
+    @And("^citizen has following outgoings:")
+    public void citizenHasOutgoings(List<Outgoing> outgoings) throws Throwable {
+
+        means.setOutgoings(outgoings);
     }
 
     @When("^rule engine is executed$")
@@ -97,9 +123,15 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         kieSession.execute(Stream.of(crimeCase, decisionReport).collect(Collectors.toList()));
     }
 
+
+    @Then("^citizen is \"([^\"]*)\"$")
+    public void applicantIsEmployed(EmploymentStatus status) {
+        assertThat(decisionReport.getEmploymentStatus()).isEqualTo(status);
+    }
+
     @Then("^citizen employed income is (\\d+.\\d+)$")
     public void applicantEmployedIncomeIs(BigDecimal expectedEmployedIncome) {
-        assertThat(decisionReport.getEmploymentIncome()).isEqualTo(expectedEmployedIncome);
+        assertThat(decisionReport.getEmploymentIncome()).isEqualTo(expectedEmployedIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
     @Then("^citizen gross combined household income is (\\d+.\\d+)$")
@@ -112,29 +144,39 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         assertThat(decisionReport.getAdjustedIncome()).isEqualTo(expectedAdjustedIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
+    @Then("^citizen disposable annual income is (\\d+.\\d+)$")
+    public void applicantDisposableIncomeIs(BigDecimal disposableIncome) {
+        assertThat(decisionReport.getDisposableIncome()).isEqualTo(disposableIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
+    }
+
+    @Then("^ citizen annual outgoings is (\\d+.\\d+)$")
+    public void applicantOutgoingIs(BigDecimal annualOutgoings) {
+        assertThat(decisionReport.getTotalOutgoings()).isEqualTo(annualOutgoings);
+    }
+
     @Then("^total weighting  is (\\d+.\\d+)$")
     public void totalWeightingIs(BigDecimal weighting) throws Throwable {
-        assertThat(weighting).isEqualTo(decisionReport.getTotalWeight());
+        assertThat(decisionReport.getTotalWeight()).isEqualTo(weighting);
     }
 
-    @Then("^adjustedIncomeBelowLowerThreshold is true$")
-    public void adjustedIncomeBelowLowerThreshold() {
-        assertThat(true).isEqualTo(decisionReport.isAdjustedIncomeBelowLowerThreshold());
+    @Then("^adjustedIncomeBelowLowerThreshold is ([^\"]*)$")
+    public void adjustedIncomeBelowLowerThreshold(boolean adjustedIncomeBelowLowerThreshold) {
+        assertThat(decisionReport.isAdjustedIncomeBelowLowerThreshold()).isEqualTo(adjustedIncomeBelowLowerThreshold);
     }
     
-    @Then("^court type is megistrate$")
-    public void courtType() {
-        assertThat(CourtType.MAGISTRATE).isEqualTo(decisionReport.getCourtType());
+    @Then("^court type is ([^\"]*)$")
+    public void courtType(CourtType courtType) {
+        assertThat(decisionReport.getCourtType()).isEqualTo(courtType);
     }
     
-    @Then("^case type is indictable$")
-    public void caseType() {
-        assertThat(CaseType.INDICTABLE).isEqualTo(decisionReport.getCaseType());
+    @Then("^case type is ([^\"]*)$")
+    public void caseType(CaseType caseType) {
+        assertThat(decisionReport.getCaseType()).isEqualTo(caseType);
     }
 
-    @Then("^citizen passed means test$")
-    public void meansPassed() {
-        assertThat(CrimeAssessmentResult.PASSED).isEqualTo(decisionReport.getCrimeAssessmentResult());
+    @Then("^citizen ([^\"]*) means test$")
+    public void meansPassed(CrimeAssessmentResult result) {
+        assertThat(decisionReport.getCrimeAssessmentResult()).isEqualTo(result);
     }
 
 }

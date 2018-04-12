@@ -8,6 +8,4 @@ import org.junit.runner.RunWith;
 @CucumberOptions(features = "src/test/resources", glue= {"com.uk.moj.laa.atp.crime.steps"}, plugin ={"pretty" , "html:target/crime-means-tests"})
 public class CrimeMeansIntegrationTest {
 	
-
-
 }
