@@ -149,7 +149,7 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         assertThat(decisionReport.getDisposableIncome()).isEqualTo(disposableIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
-    @Then("^ citizen annual outgoings is (\\d+.\\d+)$")
+    @Then("^citizen annual outgoings is (\\d+.\\d+)$")
     public void applicantOutgoingIs(BigDecimal annualOutgoings) {
         assertThat(decisionReport.getTotalOutgoings()).isEqualTo(annualOutgoings);
     }

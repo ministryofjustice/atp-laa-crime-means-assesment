@@ -3,14 +3,12 @@ package rules.crime.means.decision
 import com.laa.model.crime.CrimeMeansDecisionReport;
 import com.laa.model.crime.CourtType;
 import com.laa.model.crime.CrimeAssessmentResult;
-
-
 import java.math.BigDecimal;
 
 
 rule "adjusted income limit check"
 	when
-		$decision : CrimeMeansDecisionReport( adjustedIncome !=null && adjustedIncome.compareTo(new BigDecimal("12475")) < 0)
+		$decision : CrimeMeansDecisionReport( adjustedIncome != null && adjustedIncome.compareTo(new BigDecimal("12475")) < 0)
 	then
 		$decision.setAdjustedIncomeBelowLowerThreshold(true);
 		update($decision);

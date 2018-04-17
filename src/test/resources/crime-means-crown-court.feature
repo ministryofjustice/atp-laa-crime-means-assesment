@@ -1,5 +1,5 @@
 
-  Feature: Test a Crime case in crown court
+  Feature: Means assesment for crime case in crown court
 
     Scenario: an unemployed citizen
 
@@ -7,17 +7,16 @@
     															
       When  rule engine is executed
       Then citizen is "UNEMPLOYED"
-      #Then citizen employed income is 0.00
-    	#Then citizen employed income is 0.0
-      #Then citizen adjusted income is 10024.39
+      #Then citizen employed income is null
+      #Then citizen adjusted income is 0.0
       #Then citizen gross combined household income is 24660.00
       Then adjustedIncomeBelowLowerThreshold is true
-      #Then total weighting  is 1
+      Then total weighting  is 1.0
       Then court type is CROWN
       Then case type is TRIAL_IN_CROWN_COURT
       Then citizen PASSED means test
       
-    Scenario: an employed citizen with employed partner and child (full means assesment)
+    Scenario: An employed citizen with employed partner and child (full means assesment: case 04)
 
       Given a Indictable and CROWN case:
       
@@ -43,12 +42,12 @@
                                                       | 2000 | 0 | 0 | monthly |																																			
 	      When  rule engine is executed
       Then citizen is "EMPLOYED"
-      #Then citizen employed income is 0.00
-    	#Then citizen employed income is 0.0
-      #Then citizen adjusted income is 10024.39
-      #Then citizen gross combined household income is 24660.00
+      Then citizen employed income is 30000.00
+    	#Then citizen partner income is 24000
+      Then citizen adjusted income is 24681.61
+      Then citizen gross combined household income is 55040.00
       Then adjustedIncomeBelowLowerThreshold is false
-      #Then total weighting  is 1
+      Then total weighting  is 2.23
       Then court type is CROWN
       Then case type is INDICTABLE
       Then citizen PASSED_WITH_CONTRIBUTION means test

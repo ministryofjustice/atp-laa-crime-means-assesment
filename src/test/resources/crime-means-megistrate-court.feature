@@ -1,5 +1,5 @@
 
-  Feature: Test a Crime case in megistrate court
+  Feature: Means assesment for crime case in magistrate court
 
     Scenario: an employed citizen with partner and children (partial means assesment)
 
@@ -42,8 +42,7 @@
       
       
       
-      
- Scenario: an employed citizen with children and no partner(full means assesment) 
+ Scenario: An employed citizen with children and no partner(full means assesment) 
 
     Given a SUMMARY_ONLY and MAGISTRATE case:
 
@@ -76,7 +75,7 @@
       Then citizen adjusted income is 22056.14
       Then citizen gross combined household income is 37716.00
       Then citizen disposable annual income is 8910.04
-      #Then citizen annual outgoings is 19100.0
+      Then citizen annual outgoings is 19100.0
       Then total weighting  is 1.71
       Then adjustedIncomeBelowLowerThreshold is false
       Then court type is MAGISTRATE
@@ -96,9 +95,9 @@
 
       When  rule engine is executed
       Then citizen is "EMPLOYED"
-      #Then citizen employed income is 8640.00
-      #Then citizen adjusted income is 10024.39
-      #Then citizen gross combined household income is 24660.00
+      Then citizen employed income is 48000.00
+      Then citizen adjusted income is 48000.00
+      Then citizen gross combined household income is 48000.00
       Then total weighting  is 1.00
       Then adjustedIncomeBelowLowerThreshold is false
       Then court type is MAGISTRATE
