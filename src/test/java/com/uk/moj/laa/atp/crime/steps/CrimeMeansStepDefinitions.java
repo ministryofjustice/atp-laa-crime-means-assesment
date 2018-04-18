@@ -134,14 +134,36 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         assertThat(decisionReport.getEmploymentIncome()).isEqualTo(expectedEmployedIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
+    @Then("^citizen partner income is (\\d+.\\d+)$")
+    public void citizenPartnerIncomeIs(BigDecimal expectedEmployedIncome) {
+        assertThat(decisionReport.getPartnerEmploymentIncome()).isEqualTo(expectedEmployedIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
+    }
+    
+
+    @Then("^citizen partner income is null$")
+    public void citizenPartnerIncomeIsNull() {
+        assertThat(decisionReport.getPartnerEmploymentIncome()).isNull();;
+    }
+    
+     
     @Then("^citizen gross combined household income is (\\d+.\\d+)$")
     public void applicantGrossHouseHoldIncomeIs(BigDecimal expectedGrossHouseHoldIncome) {
         assertThat(decisionReport.getGrossHouseholdIncome()).isEqualTo(expectedGrossHouseHoldIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
+    @Then("^citizen gross combined household income is null$")
+    public void applicantGrossHouseHoldIncomeIsNull() {
+        assertThat(decisionReport.getGrossHouseholdIncome()).isNull();;
+    }
+    
     @Then("^citizen adjusted income is (\\d+.\\d+)$")
     public void applicantAdjustedIncomeIs(BigDecimal expectedAdjustedIncome) {
         assertThat(decisionReport.getAdjustedIncome()).isEqualTo(expectedAdjustedIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
+    }
+
+    @Then("^citizen adjusted income is zero$")
+    public void applicantAdjustedIncomeIsZero() {
+        assertThat(decisionReport.getAdjustedIncome()).isEqualTo(new BigDecimal(0));
     }
 
     @Then("^citizen disposable annual income is (\\d+.\\d+)$")

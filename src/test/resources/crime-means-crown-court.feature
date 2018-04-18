@@ -7,9 +7,9 @@
     															
       When  rule engine is executed
       Then citizen is "UNEMPLOYED"
-      #Then citizen employed income is null
-      #Then citizen adjusted income is 0.0
-      #Then citizen gross combined household income is 24660.00
+      Then citizen partner income is null
+      Then citizen adjusted income is zero
+      Then citizen gross combined household income is null
       Then adjustedIncomeBelowLowerThreshold is true
       Then total weighting  is 1.0
       Then court type is CROWN
@@ -43,7 +43,7 @@
 	      When  rule engine is executed
       Then citizen is "EMPLOYED"
       Then citizen employed income is 30000.00
-    	#Then citizen partner income is 24000
+    	Then citizen partner income is 24000.00
       Then citizen adjusted income is 24681.61
       Then citizen gross combined household income is 55040.00
       Then adjustedIncomeBelowLowerThreshold is false
