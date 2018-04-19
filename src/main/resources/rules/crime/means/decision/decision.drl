@@ -16,7 +16,7 @@ rule "adjusted income limit check"
 end
 
 
-rule "Verify if means assessment is PASSED for megistrate court/crown court case when adjustedIncomeBelowLowerThreshold is true"
+rule "Verify if means assessment is PASSED when adjustedIncomeBelowLowerThreshold is true"
 	when
 		$decision: CrimeMeansDecisionReport(adjustedIncomeBelowLowerThreshold  == true )
 	then
@@ -25,7 +25,7 @@ rule "Verify if means assessment is PASSED for megistrate court/crown court case
 end
 
 
-rule "Verify if means assessment is FAILED  for megistrate court case when disposableincome is above than threshold £3,398 "
+rule "Verify if means assessment is FAILED  for magistrate court case when disposableincome is above than threshold £3,398 "
 	when
 		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("3398")) > 0 )
 	then
@@ -42,7 +42,7 @@ rule "Verify if means assessment is PASSED_WITH_CONTRIBUTION  for crown court ca
 		update($decision);
 end
 
-rule "Verify if means assessment is FAILed  for crown megistrate case when adjestedIncome is above than threshold £22325 "
+rule "Verify if means assessment is FAILed  for crown magistrate case when adjestedIncome is above than threshold £22325 "
 	when
 		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("22325")) > 0 )
 	then

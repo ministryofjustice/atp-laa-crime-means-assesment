@@ -46,26 +46,27 @@ rule "set caseType"
 end
 
 
-rule "set applicant's employment status"
-lock-on-active  true
-	when
-		$case : CrimeCase( )
-		$decision : CrimeMeansDecisionReport( employmentStatus == null  )
-		
-	then
-	
-	 if ($case.getMeansInformation().getApplicant().getEmployedIncomeHistory() == null || $case.getMeansInformation().getApplicant().getEmployedIncomeHistory().isEmpty()) {
-	 		$decision.setEmploymentStatus(EmploymentStatus.UNEMPLOYED);
-	 } 
-	 else {
-	 		$decision.setEmploymentStatus(EmploymentStatus.EMPLOYED);
-	 }
-	 
-		update($decision);
+rule "set applicant's employment status as employed"
+   when
+      $case : CrimeCase( meansInformation.applicant.employedIncomeHistory != null &&  meansInformation.applicant.employedIncomeHistory.empty   == false)
+      $decision : CrimeMeansDecisionReport( employmentStatus == null  )
+      
+   then
+      $decision.setEmploymentStatus(EmploymentStatus.EMPLOYED);
+      update($decision);
+end
+
+rule "set applicant's employment status as unemployed"
+   when
+      $case : CrimeCase( meansInformation.applicant.employedIncomeHistory == null ||  meansInformation.applicant.employedIncomeHistory.empty   == true)
+      $decision : CrimeMeansDecisionReport( employmentStatus == null  )
+      
+   then
+      $decision.setEmploymentStatus(EmploymentStatus.UNEMPLOYED);
+      update($decision);
 end
 
 // frequency for tax and ni could not be same as income frequecy, so model may change, for now it kept same.
-
 rule "calculate applicant's employed income,ni, tax , gross household income"
 lock-on-active  true
 	when
@@ -78,21 +79,23 @@ lock-on-active  true
 		BigDecimal annualNI = new BigDecimal(0.00);
 		BigDecimal annualTax = new BigDecimal(0.00);
 		
+		int annualMultiplier = employedIncome.getFrequency().getAnnualMultiplier();
+		
 		if (employedIncome.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(12));
-			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(12));
-			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(12));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(annualMultiplier));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if (employedIncome.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(52));
-			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(52));
-			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(52));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(annualMultiplier));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(annualMultiplier));
 			
 		}
 		else if (employedIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(26));
-			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(26));
-			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(26));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
+			annualNI = employedIncome.getNationalInsurance().multiply(new BigDecimal(annualMultiplier));
+			annualTax = employedIncome.getIncomeTax().multiply(new BigDecimal(annualMultiplier));
 		}
 		 else if (employedIncome.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualPay = employedIncome.getPay();
@@ -104,8 +107,8 @@ lock-on-active  true
 		$decision.setEmploymentIncome(annualPay.setScale(2, BigDecimal.ROUND_HALF_EVEN));
 		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualPay).setScale(2, BigDecimal.ROUND_HALF_EVEN));
 		$decision.setTotalOutgoings(Optional.ofNullable($decision.getTotalOutgoings()).orElse(BigDecimal.ZERO).add($decision.getPayeAndNi()));
-	 System.out.println("annualPay " + annualPay);
 		
+	 System.out.println("annualPay " + annualPay);
 	 System.out.println("annualTax " + annualTax);
 	 System.out.println("annualNI " + annualNI);
 	 
@@ -122,25 +125,25 @@ lock-on-active  true
 	
 		//todo we should consider ni and tax as well like we do for applicant, spreadsheet does not have such case.
 		EmployedIncome employedIncome  = $case.getMeansInformation().getPartner().getEmployedIncome();
+		int annualMultiplier = employedIncome.getFrequency().getAnnualMultiplier();
 		
 		BigDecimal annualPay = new BigDecimal(0.00);
 		
 		if (employedIncome.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(12));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if (employedIncome.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(52));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
 			
 		}
 		else if (employedIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualPay = employedIncome.getPay().multiply(new BigDecimal(26));
+			annualPay = employedIncome.getPay().multiply(new BigDecimal(annualMultiplier));
 		}
 		 else if (employedIncome.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualPay = employedIncome.getPay();
 		}
 		
 		$decision.setPartnerEmploymentIncome(annualPay.setScale(2, BigDecimal.ROUND_HALF_EVEN));
-		// can we set grossHouseholdIncome to zero so that I don't do the null check below. this oncome is about addition not substration. check in other rules as well.
 		$decision.setGrossHouseholdIncome(Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).add(annualPay).setScale(2, BigDecimal.ROUND_HALF_EVEN));
 		
 	 	System.out.println("partner annualPay " + annualPay);
@@ -158,15 +161,16 @@ when
 	then
 	
 		BigDecimal annualChildBenefit = new BigDecimal(0.00);
-		
+		int annualMultiplier = $benefit.getFrequency().getAnnualMultiplier();
+
 		if($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(12));
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(52));
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(26));
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualChildBenefit = $benefit.getAmount();
@@ -190,15 +194,16 @@ when
 	then
 	
 		BigDecimal annualChildTaxCredit = new BigDecimal(0.00);
+		int annualMultiplier = $benefit.getFrequency().getAnnualMultiplier();
 		
 		if($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(12));
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(52));
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(26));
+			annualChildTaxCredit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualChildTaxCredit = $benefit.getAmount();
@@ -221,15 +226,16 @@ lock-on-active
 		
 	then
 		BigDecimal annualChildCareFee = new BigDecimal(0.00);
+		int annualMultiplier = $childCareFees.getFrequency().getAnnualMultiplier();
 		
 		if($childCareFees.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(12));
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if($childCareFees.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(52));
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(annualMultiplier));
 			
 		}else if($childCareFees.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(26));
+			annualChildCareFee = $childCareFees.getAmount().multiply(new BigDecimal(annualMultiplier));
 		
 		}else if($childCareFees.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualChildCareFee = $childCareFees.getAmount();
@@ -251,13 +257,14 @@ lock-on-active
 		
 	then
 		BigDecimal annualMortgage = new BigDecimal(0.00);
+		int annualMultiplier = $mortgage.getFrequency().getAnnualMultiplier();
 		
 		if($mortgage.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(12));
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($mortgage.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(52));
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($mortgage.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(26));
+			annualMortgage = $mortgage.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($mortgage.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualMortgage = $mortgage.getAmount();
 		}
@@ -279,13 +286,14 @@ lock-on-active
 		
 	then
 		BigDecimal annualCouncilTax = new BigDecimal(0.00);
+		int annualMultiplier = $councilTax.getFrequency().getAnnualMultiplier();
 		
 		if($councilTax.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(12));
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($councilTax.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(52));
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($councilTax.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(26));
+			annualCouncilTax = $councilTax.getAmount().multiply(new BigDecimal(annualMultiplier));
 		} else if($councilTax.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualCouncilTax = $councilTax.getAmount();
 		}
@@ -307,15 +315,16 @@ when
 		
 	then
 		BigDecimal annualMiscIncome = new BigDecimal(0.00);
+		int annualMultiplier = $miscOtherIncome.getFrequency().getAnnualMultiplier();
 		
 		if ($miscOtherIncome.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualMiscIncome = $miscOtherIncome.getAmount().multiply(new BigDecimal(12));
+			annualMiscIncome = $miscOtherIncome.getAmount().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if ($miscOtherIncome.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(52));
+			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if ($miscOtherIncome.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(26));
+			annualMiscIncome =  $miscOtherIncome.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if ($miscOtherIncome.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualMiscIncome =  $miscOtherIncome.getAmount();
@@ -338,16 +347,18 @@ when
 		// TODO: above rule can also meet this condition so do we need to lock??
 		
 	then
+	
 		BigDecimal annualMaintenance = new BigDecimal(0.00);
+		int annualMultiplier = $maintenanceBenefit.getFrequency().getAnnualMultiplier();
 		
 		if ($maintenanceBenefit.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualMaintenance = $maintenanceBenefit.getAmount().multiply(new BigDecimal(12));
+			annualMaintenance = $maintenanceBenefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(52));
+			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(26));
+			annualMaintenance =  $maintenanceBenefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}
 		else if ($maintenanceBenefit.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualMaintenance =  $maintenanceBenefit.getAmount();
@@ -373,14 +384,15 @@ when
 	then
 	
 		BigDecimal annualChildBenefit = new BigDecimal(0.00);
+		int annualMultiplier = $benefit.getFrequency().getAnnualMultiplier();
 		
 		if ($benefit.getFrequency() == PaymentFrequency.MONTHLY) {
-			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(12));
+			annualChildBenefit = $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 			
 		} else if ($benefit.getFrequency() == PaymentFrequency.WEEKLY) {
-			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(52));
+			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}else if ($benefit.getFrequency() == PaymentFrequency.BIWEEKLY) {
-			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(26));
+			annualChildBenefit =  $benefit.getAmount().multiply(new BigDecimal(annualMultiplier));
 		}else if ($benefit.getFrequency() == PaymentFrequency.ANNUAL) {
 			annualChildBenefit =  $benefit.getAmount();
 		}
@@ -428,7 +440,6 @@ end
 
 rule "process total weight"
 when
-		// TODO: what happens if this rule runs before partner and child weight calculation.
 		// there is no separate rule for applicant weight as it is fixed value and always there will be one applicant in one case.
 		$decision : CrimeMeansDecisionReport(  )
 then
@@ -448,9 +459,8 @@ end
 rule "process adjusted income"
 when
 		$decision : CrimeMeansDecisionReport() ;
-		// TODO: what happens if this rule runs before total, partner and child weight calculation.
-		 
 then
+
 	BigDecimal annualAdjustedIncome =  Optional.ofNullable($decision.getGrossHouseholdIncome()).orElse(BigDecimal.ZERO).
 										divide(Optional.ofNullable($decision.getTotalWeight()).orElse(BigDecimal.ONE), RoundingMode.HALF_EVEN);
 	System.out.println("annualAdjustedIncome     " + annualAdjustedIncome);
@@ -477,7 +487,6 @@ end
 rule "process disposable annual income"
 when
 		$decision : CrimeMeansDecisionReport( grossHouseholdIncome != null, disposableIncome == null  )
-		 // TODO: what happens if this rule runs early and grossHouseholdIncome or disposableIncome is null at that time?.
 		 // TODO: do we need to check for getTotalOutgoings null value and getAdjustedLivingAllowance null value?
 then
 
