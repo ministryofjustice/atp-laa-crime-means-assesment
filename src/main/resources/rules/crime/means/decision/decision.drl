@@ -3,14 +3,12 @@ package rules.crime.means.decision
 import com.laa.model.crime.CrimeMeansDecisionReport;
 import com.laa.model.crime.CourtType;
 import com.laa.model.crime.CrimeAssessmentResult;
-
-
 import java.math.BigDecimal;
 
 
 rule "adjusted income limit check"
 	when
-		$decision : CrimeMeansDecisionReport( adjustedIncome !=null && adjustedIncome.compareTo(new BigDecimal("12475")) < 0)
+		$decision : CrimeMeansDecisionReport( adjustedIncome != null && adjustedIncome.compareTo(new BigDecimal("12475")) < 0)
 	then
 		$decision.setAdjustedIncomeBelowLowerThreshold(true);
 		update($decision);
@@ -18,17 +16,39 @@ rule "adjusted income limit check"
 end
 
 
-rule "Verify if means assessment is passed for megistrate court case when adjustedIncomeBelowLowerThreshold is true"
+rule "Verify if means assessment is PASSED when adjustedIncomeBelowLowerThreshold is true"
 	when
-		$decision: CrimeMeansDecisionReport(adjustedIncomeBelowLowerThreshold  == true, courtType == CourtType.MAGISTRATE )
+		$decision: CrimeMeansDecisionReport(adjustedIncomeBelowLowerThreshold  == true )
 	then
 		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED);
 		update($decision);
 end
 
 
+rule "Verify if means assessment is FAILED  for magistrate court case when disposableincome is above than threshold £3,398 "
+	when
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("3398")) > 0 )
+	then
+		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.FAILED);
+		update($decision);
+end
 
 
+rule "Verify if means assessment is PASSED_WITH_CONTRIBUTION  for crown court case when disposableincome is above than threshold £3,398 "
+	when
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.CROWN &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("3398")) > 0 )
+	then
+		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED_WITH_CONTRIBUTION);
+		update($decision);
+end
+
+rule "Verify if means assessment is FAILed  for crown magistrate case when adjestedIncome is above than threshold £22325 "
+	when
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("22325")) > 0 )
+	then
+		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.FAILED);
+		update($decision);
+end
 
 
 
