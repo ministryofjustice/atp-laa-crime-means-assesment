@@ -12,4 +12,6 @@ https://dsdmoj.atlassian.net/wiki/spaces/LAAATPAA/pages/638353936/Crime+Automati
 `mvn clean install`
 
 
+TEST a change
+
 For example the audit message looks like this
