@@ -64,6 +64,16 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
         applicant.setOtherIncome(exitingOtherIncome);
         means.setApplicant(applicant);
     }
+    
+    @And("^citizen receives the following pension benefit:")
+    public void citizenPensionIncome(List<OtherIncome> otherIncomes) {
+
+        Applicant applicant = ofNullable(means.getApplicant()).orElse(new Applicant());
+        List<OtherIncome> existingOtherIncome = ofNullable(applicant.getOtherIncome()).orElse(new ArrayList<OtherIncome>());
+        existingOtherIncome.addAll(otherIncomes);
+        applicant.setOtherIncome(existingOtherIncome);
+        means.setApplicant(applicant);
+    }
 
     @And("^citizen receives the following miscellanious benefit:")
     public void citizenMiscellaniousIcome(List<OtherIncome> otherIncomes) {
@@ -96,7 +106,7 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
     public void partnerIncome(List<EmployedIncome> employedIncome) {
 
         Partner partner = ofNullable(means.getPartner()).orElse(new Partner());
-        partner.setEmployedIncome(employedIncome.get(0));
+        partner.setEmployedIncomeHistory(employedIncome.get(0));
         means.setPartner(partner);
         crimeCase.setMeansInformation(means);
     }
@@ -168,6 +178,7 @@ public class CrimeMeansStepDefinitions extends SpringIntegrationTest {
 
     @Then("^citizen disposable annual income is (\\d+.\\d+)$")
     public void applicantDisposableIncomeIs(BigDecimal disposableIncome) {
+    	//System.out.println("************************" +disposableIncome);
         assertThat(decisionReport.getDisposableIncome()).isEqualTo(disposableIncome.setScale(2, BigDecimal.ROUND_HALF_EVEN));
     }
 
