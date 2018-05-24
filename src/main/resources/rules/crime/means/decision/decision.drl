@@ -33,25 +33,34 @@ rule "Verify if means assessment is FAILED  for magistrate court case when dispo
 		update($decision);
 end
 
-
-rule "Verify if means assessment is PASSED_WITH_CONTRIBUTION  for crown court case when disposableincome is above than threshold £3,398 "
+rule "Verify if means assessment is FAILED  for magistrate court case when grossHousehod is above than threshold £3,398 "
 	when
-		$decision: CrimeMeansDecisionReport(courtType == CourtType.CROWN &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("3398")) > 0 )
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  disposableIncome !=null && disposableIncome.compareTo(new BigDecimal("3398")) <= 0 )
+	then
+		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED);
+		update($decision);
+end
+
+
+rule "Verify if means assessment is PASSED_WITH_CONTRIBUTION for crown court case when grossHouseholdIncome is above the threshold £3,398 "
+	when
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.CROWN && grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("3398")) > 0 
+												&& disposableIncome != null && disposableIncome.compareTo(new BigDecimal("37500")) <= 0)
 	then
 		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.PASSED_WITH_CONTRIBUTION);
 		update($decision);
 end
 
-rule "Verify if means assessment is FAILed  for crown magistrate case when adjestedIncome is above than threshold £22325 "
+
+
+rule "Verify if means assessment is FAILED  for crown court case when disposableIncome is above the threshold £37500 "
 	when
-		$decision: CrimeMeansDecisionReport(courtType == CourtType.MAGISTRATE &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("22325")) > 0 )
+		$decision: CrimeMeansDecisionReport(courtType == CourtType.CROWN &&  grossHouseholdIncome !=null && grossHouseholdIncome.compareTo(new BigDecimal("22325")) > 0 
+											&& disposableIncome != null && disposableIncome.compareTo(new BigDecimal("37500")) > 0)
 	then
 		$decision.setCrimeAssessmentResult(CrimeAssessmentResult.FAILED);
 		update($decision);
 end
-
-
-
 
 
 

@@ -1,7 +1,7 @@
 
   Feature: Means assesment for crime case in crown court
 
-    Scenario: an unemployed citizen
+    Scenario: Case 2 an unemployed citizen
 
       Given a TRIAL_IN_CROWN_COURT and CROWN case:
     															
@@ -16,7 +16,7 @@
       Then case type is TRIAL_IN_CROWN_COURT
       Then citizen PASSED means test
       
-    Scenario: An employed citizen with employed partner and child (full means assesment: case 04)
+    Scenario: Case 4 An employed citizen with employed partner and child (full means assesment: case 04)
 
       Given a Indictable and CROWN case:
       
@@ -40,7 +40,7 @@
   		And citizen has following partner with EmployedIncome income:
                                                       | pay| incomeTax | nationalInsurance| frequency|
                                                       | 2000 | 0 | 0 | monthly |																																			
-	      When  rule engine is executed
+	    When rule engine is executed
       Then citizen is "EMPLOYED"
       Then citizen employed income is 30000.00
     	Then citizen partner income is 24000.00
@@ -52,5 +52,29 @@
       Then case type is INDICTABLE
       Then citizen PASSED_WITH_CONTRIBUTION means test
       
-      # why disposable income is not having 2 decimal points £18,783 
+    Scenario: Case 6 An employed citizen with employed partner and no children (full means assesment)
+
+      Given a TRIAL_IN_CROWN_COURT and CROWN case:
       
+	    And citizen is employed with following income:
+  															| pay |  incomeTax | nationalInsurance | frequency |
+  															| 4000 | 1200 | 1000 | monthly |
+	    													
+      And citizen has following outgoings:
+															| outGoingType | amount | frequency |
+															| COUNCIL_TAX	| 2300 | ANNUAL |
+															
+  		And citizen has following partner with EmployedIncome income:
+                                                      | pay| incomeTax | nationalInsurance| frequency|
+                                                      | 3000 | 0 | 0 | monthly |																																			
+	    When rule engine is executed
+      Then citizen is "EMPLOYED"
+      Then citizen employed income is 48000.00
+    	Then citizen partner income is 36000.00
+      Then citizen adjusted income is 51219.51
+      Then citizen gross combined household income is 84000.00
+      Then adjustedIncomeBelowLowerThreshold is false
+      Then total weighting  is 1.64
+      Then court type is CROWN
+      Then case type is TRIAL_IN_CROWN_COURT
+      Then citizen FAILED means test
